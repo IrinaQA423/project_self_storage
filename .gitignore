@@ -136,4 +136,4 @@ Test_all.py
 Thumbs.db
 .DS_Store
 Space_images
-
+app.sqlite
