@@ -7,7 +7,7 @@ from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
-from data_base.db_conf import BocksVolume
+from data_base.db_conf import BocksVolume, Warehouse
 from helpers import get_all_addresses, get_allowed_items, get_prohibited_items, get_pricing_text, process_agreement_accept, process_agreement_decline
 
 REGISTRATION, NAME, LAST_NAME, PATRONYMIC, ADDRESS, PHONE, EMAIL = range(7)
@@ -78,29 +78,29 @@ def button_callback(update: Update, context: CallbackContext) -> None:
         )
 
     elif query.data == "self_pickup":  # Новый обработчик для самовывоза
-        addresses = get_all_addresses()
+        available_wh = Warehouse.get_all_available_warehouse()
+        #addresses = get_all_addresses()
         # Создаем кнопки для каждого адреса
-        address_buttons = [
-            [InlineKeyboardButton(address, callback_data=f"address_{i}")]
-            for i, address in enumerate(addresses)
-        ]
+        wh_keyboard = []
+        for wh in available_wh:
+            wh_keyboard.append([InlineKeyboardButton(wh.address, callback_data=f"address_{wh.id}")])
 
-        address_buttons.append([InlineKeyboardButton("🔙 Назад", callback_data="order_box")])
+
+        wh_keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="order_box")])
         query.edit_message_text(
             text="🏭 Выберите склад для самовывоза:",
-            reply_markup=InlineKeyboardMarkup(address_buttons)
+            reply_markup=InlineKeyboardMarkup(wh_keyboard)
         )
 
     elif query.data.startswith("address_"):
-        address_num = int(query.data.split("_")[1])
-        addresses = get_all_addresses()
-        selected_address = addresses[address_num]
+        context.user_data["choosen_adress_id"] = query.data.split("_")[-1]
+        selected_address = Warehouse.get_warehouse_adress_by_id(query.data.split("_")[-1])
 
         context.user_data['selected_address'] = selected_address
         volums = BocksVolume.get_all_bocks_volum()
         keyboard = []
         for i in volums:
-            keyboard.append([InlineKeyboardButton(f"📦 {i.volume} м³", callback_data=f"size_{i.id}")])
+            keyboard.append([InlineKeyboardButton(f"📦 {i.text} {i.volume} м³", callback_data=f"size_{i.id}")])
         keyboard.append([InlineKeyboardButton("🔙 Назад к складам", callback_data="self_pickup")])
         keyboard.append([InlineKeyboardButton("🏠 В главное меню", callback_data="open_menu")])
 
@@ -111,18 +111,12 @@ def button_callback(update: Update, context: CallbackContext) -> None:
         )
 
     elif query.data.startswith("size_"):  # Обработка выбора размера бокса
-        size_mapping = {
-            "size_small": ("Малый (3 м³)", 1500),
-            "size_medium": ("Средний (5 м³)", 3500),
-            "size_large": ("Большой (10 м³)", 5000)
-        }
-
-        selected_size, selected_price = size_mapping[query.data]
+        choosen_volume: BocksVolume = BocksVolume.get_volume_by_id(query.data.split("_")[-1])
         selected_address = context.user_data.get('selected_address', 'не указан')
 
         # Сохраняем выбор
-        context.user_data['selected_size'] = selected_size
-        context.user_data['selected_price'] = selected_price
+        context.user_data['selected_size'] = f"{choosen_volume.text} ({choosen_volume.volume} м³)"
+        context.user_data['selected_price'] = choosen_volume.cost
 
         # Создаем клавиатуру для выбора даты начала
         today = datetime.now()
@@ -138,13 +132,13 @@ def button_callback(update: Update, context: CallbackContext) -> None:
                 )]
             )
 
-        days_keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data=f"address_{list(get_all_addresses()).index(selected_address)}")])
+        days_keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data=f"address_{context.user_data['choosen_adress_id']}")])
 
         query.edit_message_text(
             text=f"📝 Ваш выбор:\n\n"
                  f"🏭 Склад: {selected_address}\n"
-                 f"📦 Размер бокса: {selected_size}\n"
-                 f"💳 Стоимость: {selected_price} руб/мес\n\n"
+                 f"📦 Размер бокса: {choosen_volume.text} ({choosen_volume.volume} м³)\n"
+                 f"💳 Стоимость: {choosen_volume.cost} руб/мес\n\n"
                  "📅 Выберите дату начала аренды:",
             reply_markup=InlineKeyboardMarkup(days_keyboard)
         )
