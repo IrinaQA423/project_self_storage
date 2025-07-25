@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from sqlalchemy import create_engine, ForeignKey, select
+from sqlalchemy import create_engine, ForeignKey, select, and_
 from sqlalchemy import Column, Integer, String, Boolean, Date
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship
 from sqlalchemy.orm import declarative_base
@@ -37,6 +37,9 @@ class User(Base):
         return f'<info {self.tg_id} {self.name} {self.email} {self.phone} {self.consent_pd} {self.address}>'
 
     def create(self):
+        """
+        Метод для создания объекта
+        """
         db_session.add(self)
         db_session.commit()
 
@@ -61,8 +64,28 @@ class BocksVolume(Base):
         return f'<info {self.volume} >'
 
     def create(self):
+        """
+        Метод для создания объекта
+        """
         db_session.add(self)
         db_session.commit()
+
+    @classmethod
+    def get_all_bocks_volum(cls):
+        """
+        Возвращает все доступные объемы
+        :return:
+        """
+        return db_session.execute(select(cls)).scalars().all()
+
+    @classmethod
+    def get_volume_by_id(cls, vol_id: int):
+        """
+        Возвращает значение  по id
+        :param vol_id:
+        :return:
+        """
+        return db_session.get(cls, vol_id).volume
 
 
 class Order(Base):
@@ -95,7 +118,40 @@ class Order(Base):
         self.warehouse_id = warehouse_id
 
     def create(self):
+        """
+         Метод для создания объекта
+        """
         db_session.add(self)
+        db_session.commit()
+
+    @classmethod
+    def get_user_orders(cls, user_id: int):
+        """
+        Получить все заказы пользователя
+        :param user_id: айди пользователя
+        :return:
+        """
+        return db_session.execute(select(cls).where(cls.user_id == user_id)).scalars().all()
+
+    @classmethod
+    def get_user_orders_without_payment(cls, user_id: int):
+        """
+        Получить все не оплаченные заказы пользователя
+        :param user_id: айди пользователя
+        :return:
+        """
+        return db_session.execute(select(cls).where(and_(cls.user_id == user_id, cls.payment == False))).scalars().all()
+
+    @classmethod
+    def update_payment_info(cls, order_id: int, new_status: bool):
+        """
+        Обновить поле оплаты
+        :param order_id: айди заказа
+        :param new_status: значение которое будет выставлено
+        :return:
+        """
+        order = db_session.get(cls, order_id)
+        order.payment = new_status
         db_session.commit()
 
 
@@ -113,11 +169,20 @@ class Warehouse(Base):
         self.filled_volume = filled_volume
 
     def create(self):
+        """
+         Метод для создания объекта
+        """
         db_session.add(self)
         db_session.commit()
 
     @classmethod
     def update_filling(cls, wh_id, volume):
+        """
+        Обновляет объем склада
+        :param wh_id: айди склада
+        :param volume: объем груза
+        :return:
+        """
         warehouse = db_session.get(cls, wh_id)
         warehouse.filled_volume = warehouse.filled_volume + volume
 
@@ -126,23 +191,37 @@ class Warehouse(Base):
         else:
             raise Exception(f"Склад по адресу: {warehouse.address} - переполнен")
 
+    @classmethod
+    def get_all_available_warehouse(cls):
+        """
+        Получить список всех не занятых складов
+        :return:
+        """
+        return db_session.execute(select(cls).where(cls.filled_volume < cls.total_volume)).scalars().all()
+
 
 if __name__ == "__main__":
     # Создает базу данных
-    Base.metadata.create_all(bind=engine)
-
-    #Создаем тестовые данные
-    User(123, "Тестовый пользователь", "test@test.ru", "123456", "tefwfw", 1).create()
-    BocksVolume(volume=3).create()
-    BocksVolume(volume=5).create()
-    BocksVolume(volume=10).create()
-    Warehouse(address="г. Москва, улица свободы 6", total_volume=1000).create()
-    Warehouse(address="г. Санкт-Петербург, улица ленина 10", total_volume=1500).create()
-    Warehouse(address="г. Москва, улица ленина 16", total_volume=2000).create()
-    date_start = datetime.strptime("23.07.2025", "%d.%m.%Y").date()
-    Order(user_id=123, calling_things=0, taking_it_myself=1, volume_id=1, warehouse_id=1, payment=0,
-          rent_start=date_start,
-          rent_end=date_start + relativedelta(months=6)
-          ).create()
-    db_session.commit()
+    # Base.metadata.create_all(bind=engine)
+    #
+    # #Создаем тестовые данные
+    # User(123, "Тестовый пользователь", "test@test.ru", "123456", "tefwfw", 1).create()
+    # BocksVolume(volume=3).create()
+    # BocksVolume(volume=5).create()
+    # BocksVolume(volume=10).create()
+    # Warehouse(address="г. Москва, улица свободы 6", total_volume=1000).create()
+    # Warehouse(address="г. Санкт-Петербург, улица ленина 10", total_volume=1500).create()
+    # Warehouse(address="г. Москва, улица ленина 16", total_volume=2000).create()
+    # date_start = datetime.strptime("25.07.2025", "%d.%m.%Y").date()
+    # Order(user_id=123, calling_things=1, taking_it_myself=0, volume_id=1, warehouse_id=1, payment=0,
+    #       rent_start=date_start,
+    #       rent_end=date_start + relativedelta(months=6), address_from="Дмитриров, улица Ленина, 16"
+    #       ).create()
+    # db_session.commit()
+    #print(Order.get_user_orders(123)[1].address_from)
+    # print(Warehouse.get_all_available_warehouse())
+    # print(BocksVolume.get_all_bocks_volum())
+    print(Order.get_user_orders_without_payment(123))
+    Order.update_payment_info(1,True)
+    print(Order.get_user_orders_without_payment(123))
 
