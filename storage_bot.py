@@ -4,7 +4,6 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageH
 from button_callback import button_callback
 from helpers import start, get_all_addresses, get_allowed_items, get_prohibited_items, get_pricing_text, process_agreement_accept, process_agreement_decline
 from settings import load_config
-from storage_db import save_user
 
 REGISTRATION, NAME, LAST_NAME, PATRONYMIC, ADDRESS, PHONE, EMAIL = range(7)
 

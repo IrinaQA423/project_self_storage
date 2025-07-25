@@ -7,6 +7,7 @@ from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
+from data_base.db_conf import BocksVolume
 from helpers import get_all_addresses, get_allowed_items, get_prohibited_items, get_pricing_text, process_agreement_accept, process_agreement_decline
 
 REGISTRATION, NAME, LAST_NAME, PATRONYMIC, ADDRESS, PHONE, EMAIL = range(7)
@@ -96,19 +97,17 @@ def button_callback(update: Update, context: CallbackContext) -> None:
         selected_address = addresses[address_num]
 
         context.user_data['selected_address'] = selected_address
-
-        box_sizes_keyboard = [
-            [InlineKeyboardButton("📦 Малый (3 м³)", callback_data="size_small")],
-            [InlineKeyboardButton("📦 Средний (5 м³)", callback_data="size_medium")],
-            [InlineKeyboardButton("📦 Большой (10 м³)", callback_data="size_large")],
-            [InlineKeyboardButton("🔙 Назад к складам", callback_data="self_pickup")],
-            [InlineKeyboardButton("🏠 В главное меню", callback_data="open_menu")]
-        ]
+        volums = BocksVolume.get_all_bocks_volum()
+        keyboard = []
+        for i in volums:
+            keyboard.append([InlineKeyboardButton(f"📦 {i.volume} м³", callback_data=f"size_{i.id}")])
+        keyboard.append([InlineKeyboardButton("🔙 Назад к складам", callback_data="self_pickup")])
+        keyboard.append([InlineKeyboardButton("🏠 В главное меню", callback_data="open_menu")])
 
         query.edit_message_text(
             text=f"📍 Вы выбрали склад:\n{selected_address}\n\n"
                  "📏 Теперь выберите размер бокса:",
-            reply_markup=InlineKeyboardMarkup(box_sizes_keyboard)
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
     elif query.data.startswith("size_"):  # Обработка выбора размера бокса
