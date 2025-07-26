@@ -45,10 +45,28 @@ class User(Base):
 
     @classmethod
     def check_pd(cls, tg_id):
+        """
+        Проверяет подписан ли ПД у пользователя
+        :param tg_id: айди пользователя
+        :return:
+        """
         try:
             return db_session.get(cls, tg_id).consent_pd
         except AttributeError:
             return None
+
+    @classmethod
+    def check_exist_user(cls, tg_id: int):
+        """
+        Проверяет есть ли такой пользователь в БД
+        :param tg_id: айди пользователя
+        :return:
+        """
+        try:
+            return db_session.get(User, tg_id) is not None
+        except Exception as e:
+            print(f"Ошибка при проверке пользователя: {e}")
+            return False
 
 
 class BocksVolume(Base):
