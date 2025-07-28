@@ -1,15 +1,58 @@
+import datetime
+
 from dateutil.relativedelta import relativedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup,  KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler, CallbackContext, ConversationHandler
 from sqlalchemy.exc import SQLAlchemyError    
 from button_callback import button_callback
+from data_base.db_conf import Order
 from helpers import start, get_all_addresses, get_allowed_items, get_prohibited_items, get_pricing_text, process_agreement_accept, process_agreement_decline
 from settings import load_config
-from storage_db import *
+#from storage_db import *
 from admin import admin_panel, admin_callback_handler, setup_admin_handlers
 
 
 REGISTRATION, NAME, ADDRESS, PHONE, EMAIL = range(5)
+
+def get_delays(rent_end_date):
+    rent_end_datetime = datetime.datetime.combine(rent_end_date, datetime.datetime.min.time())
+    notification_datetime = rent_end_datetime - relativedelta(months=1)
+    delay_seconds_month = (notification_datetime - datetime.datetime.now()).total_seconds()
+    notification_datetime = rent_end_datetime - relativedelta(weeks=2)
+    delay_seconds_two_weeks = (notification_datetime - datetime.datetime.now()).total_seconds()
+    notification_datetime = rent_end_datetime - relativedelta(days=3)
+    delay_seconds_tree_days = (notification_datetime - datetime.datetime.now()).total_seconds()
+
+    return delay_seconds_month, delay_seconds_two_weeks, delay_seconds_tree_days
+
+
+def add_schedule_message(update: Update, context: CallbackContext, order_id):
+    try:
+        rent_end_date = Order.get_order_end_date_by_id(order_id)  # возвращает datetime.date
+        if not rent_end_date:
+            update.message.reply_text("Не удалось получить дату окончания аренды")
+            return
+
+        month, two_week, three_days = get_delays
+        # Добавляем задачу в очередь
+        context.job_queue.run_once(
+            callback=alarm_month,
+            when=month,
+            context={
+                'chat_id': update.message.chat_id,
+                'order_id': order_id
+            }
+        )
+
+    except Exception as e:
+        update.message.reply_text(f"Ошибка: {str(e)}")
+        print(f"Ошибка в add_schedule_message: {e}")
+
+
+def alarm_month(context: CallbackContext):
+    context.bot.send_message(chat_id=context.job.context["chat_id"], text='Срок хранения истекает через месяц')
+
+
 
 
 def handle_contact_info(update: Update, context: CallbackContext) -> None:
@@ -229,11 +272,12 @@ def main() -> None:
     
         dp.add_handler(CommandHandler("start", start))
         dp.add_handler(CallbackQueryHandler(button_callback))
-                
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_contact_info))
        
         setup_admin_handlers(dp)
 
         print("Бот запущен...")
+
         updater.start_polling()
         updater.idle()
     except Exception as e:

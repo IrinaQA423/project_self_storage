@@ -176,6 +176,10 @@ class Order(Base):
         order.payment = new_status
         db_session.commit()
 
+    @classmethod
+    def get_order_end_date_by_id(cls, order_id):
+        return db_session.get(cls, order_id).rent_end
+
 
 class Warehouse(Base):
     __tablename__ = 'warehouse'
