@@ -226,13 +226,11 @@ def main() -> None:
         dp = updater.dispatcher
 
         setup_registration_handlers(dp) 
-    
+        setup_admin_handlers(dp)
+        
         dp.add_handler(CommandHandler("start", start))
         dp.add_handler(CallbackQueryHandler(button_callback))
-                
-       
-        setup_admin_handlers(dp)
-
+         
         print("Бот запущен...")
         updater.start_polling()
         updater.idle()
